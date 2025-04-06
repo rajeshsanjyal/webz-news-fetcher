@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS posts (
+  id SERIAL PRIMARY KEY,
+  uuid TEXT,
+  title TEXT NOT NULL,
+  text TEXT,
+  published TIMESTAMP,
+  url TEXT NOT NULL UNIQUE
+);
