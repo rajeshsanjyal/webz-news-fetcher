@@ -26,15 +26,15 @@ export class WebzService {
     while (hasMore) {
       const url:string = new WebzQueryBuilder(this.token)
         .setQuery(query)
-        // .setNext(next || '')
+        // .setNext(next || '') --removed for testing
         .build();
     console.log('URL:', url);
       try {
         const res = await axios.get<WebzResponse>(url);
         const { posts: chunk, moreResultsAvailable, next: nextToken, totalResults: total } = res.data;
         posts = posts.concat(chunk);
-        // hasMore = moreResultsAvailable;
-        hasMore = false;
+        // hasMore = moreResultsAvailable; --removed for testing
+        hasMore = false; //--added for testing
         next = nextToken;
         if (totalResults === 0) totalResults = total;
       } catch (err: any) {
