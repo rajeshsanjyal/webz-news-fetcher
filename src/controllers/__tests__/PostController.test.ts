@@ -1,76 +1,94 @@
+import { PostController } from '../../controllers/PostController';
+import { WebzService } from '../../services/WebzService';
 import { PostModel } from '../../models/PostModel';
-import { WebzPost } from '../../types/Post';
-import { Client } from 'pg';
+import { Logger } from 'winston';
+import { Request, Response } from 'express';
 
-// Mock the 'pg' Client
-jest.mock('pg', () => {
-  return {
-    Client: jest.fn().mockImplementation(() => ({
-      query: jest.fn(),
-    })),
-  };
-});
-
-describe('PostModel', () => {
-  let mockDb: jest.Mocked<Client>; // Correctly type it as a mocked Client
-  let postModel: PostModel;
+describe('PostController', () => {
+  let controller: PostController;
+  let mockWebzService: jest.Mocked<WebzService>;
+  let mockPostModel: jest.Mocked<PostModel>;
+  let mockLogger: jest.Mocked<Logger>;
+  let mockReq: Partial<Request>;
+  let mockRes: Partial<Response>;
 
   beforeEach(() => {
-    mockDb = new Client() as jest.Mocked<Client>; // Mock the Client type
-    postModel = new PostModel(mockDb);
+    mockWebzService = {
+      fetchAllPosts: jest.fn(),
+    } as unknown as jest.Mocked<WebzService>;
+
+    mockPostModel = {
+      insertPosts: jest.fn(),
+    } as unknown as jest.Mocked<PostModel>;
+
+    mockLogger = {
+      error: jest.fn(),
+    } as unknown as jest.Mocked<Logger>;
+
+    controller = new PostController(mockWebzService, mockPostModel, mockLogger);
+
+    mockReq = {
+      query: {},
+    };
+
+    mockRes = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    };
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should insert posts into the database', async () => {
-    const mockPosts: WebzPost[] = [
+  it('should fetch and save posts and respond with success message', async () => {
+    const mockPosts = [
       {
         uuid: 'uuid-1',
-        title: 'Post 1',
-        text: 'Post 1 text',
+        title: 'Title 1',
+        text: 'Text 1',
         published: '2024-01-01T00:00:00Z',
-        url: 'http://example.com/post1',
-      },
-      {
-        uuid: 'uuid-2',
-        title: 'Post 2',
-        text: 'Post 2 text',
-        published: '2024-01-02T00:00:00Z',
-        url: 'http://example.com/post2',
+        url: 'http://example.com/1',
       },
     ];
 
-    // Mock successful query execution
-    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+    mockWebzService.fetchAllPosts.mockResolvedValue({
+      posts: mockPosts,
+      totalResults: 5,
+    });
 
-    await postModel.insertPosts(mockPosts);
+    mockPostModel.insertPosts.mockResolvedValue(undefined);
 
-    // Check that the query method was called for each post
-    expect(mockDb.query).toHaveBeenCalledTimes(mockPosts.length);
-    mockPosts.forEach((post, index) => {
-      expect(mockDb.query).toHaveBeenCalledWith(
-        'INSERT INTO posts (title, text, published, url) VALUES ($1, $2, $3, $4)',
-        [post.title, post.text, post.published, post.url]
-      );
+    await controller.fetchAndStorePosts(
+      mockReq as Request,
+      mockRes as Response
+    );
+
+    expect(mockWebzService.fetchAllPosts).toHaveBeenCalledWith('technology');
+    expect(mockPostModel.insertPosts).toHaveBeenCalledWith(mockPosts);
+    expect(mockRes.json).toHaveBeenCalledWith({
+      message: 'Posts saved successfully',
+      retrievedCount: 1,
+      remainingCount: 4,
     });
   });
 
-  it('should throw an error if the database query fails', async () => {
-    const mockPosts: WebzPost[] = [
-      {
-        uuid: 'uuid-1',
-        title: 'Post 1',
-        text: 'Post 1 text',
-        published: '2024-01-01T00:00:00Z',
-        url: 'http://example.com/post1',
-      },
-    ];
+  it('should handle errors and respond with 500', async () => {
+    const error = new Error('Service failed');
 
-    // Simulate a database error
-    (mockDb.query as jest.Mock).mockRejectedValueOnce(new Error('Database error'));
+    mockWebzService.fetchAllPosts.mockRejectedValue(error);
 
-    await expect(postModel.insertPosts(mockPosts)).rejects.toThrow('Database error');
+    await controller.fetchAndStorePosts(
+      mockReq as Request,
+      mockRes as Response
+    );
+
+    expect(mockLogger.error).toHaveBeenCalledWith('Controller error', {
+      message: error.message,
+    });
+    expect(mockRes.status).toHaveBeenCalledWith(500);
+    expect(mockRes.json).toHaveBeenCalledWith({
+      error: 'Failed to fetch or save posts',
+    });
   });
 });
