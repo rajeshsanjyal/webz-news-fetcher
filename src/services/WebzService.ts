@@ -26,15 +26,14 @@ export class WebzService {
     while (hasMore) {
       const url:string = new WebzQueryBuilder(this.token)
         .setQuery(query)
-        // .setNext(next || '') --removed for testing
+        // .setNext(next || '') //removed for testing
         .build();
-    console.log('URL:', url);
       try {
         const res = await axios.get<WebzResponse>(url);
         const { posts: chunk, moreResultsAvailable, next: nextToken, totalResults: total } = res.data;
         posts = posts.concat(chunk);
-        // hasMore = moreResultsAvailable; --removed for testing
-        hasMore = false; //--added for testing
+        // hasMore = moreResultsAvailable; //removed for testing because my token only generated 10 repeated news only in every call
+        hasMore = false; //added for testing my token
         next = nextToken;
         if (totalResults === 0) totalResults = total;
       } catch (err: any) {
